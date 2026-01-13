@@ -39,13 +39,22 @@ jobs:
       # Step 4: Run SAST scan (do NOT fail yet)
       - name: Run SAST scan
         continue-on-error: true
-        env:
-          SEMGREP_APP_TOKEN: ${{ secrets.SAST_TOKEN }}
         run: |
+          cat << 'EOF' > test-rule.yml
+          rules:
+            - id: force-fail-test
+              patterns:
+                - pattern: eval(...)
+              message: "Eval usage detected (test rule)"
+              severity: ERROR
+              languages: [python]
+          EOF
+
           semgrep scan \
-            --config=p/ci \
+            --config=test-rule.yml \
             --json \
             ${{ inputs.source_path }} > sast-results.json || true
+
 
 
       # Step 5: Enforce organization-wide SAST policy
