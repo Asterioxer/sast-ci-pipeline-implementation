@@ -8,13 +8,6 @@ on:
         required: false
         default: "."
         type: string
-
-      fail_on_severity:
-        description: "Severity level that should fail the build (e.g., HIGH, CRITICAL)"
-        required: false
-        default: "HIGH"
-        type: string
-
     secrets:
       SAST_TOKEN:
         required: true
@@ -25,19 +18,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout the consuming repository code
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Step 2: Set up Python (required for Semgrep)
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
+      # Step 3: Install Semgrep
       - name: Install SAST tool (Semgrep)
         run: |
           pip install semgrep
 
-      # Step 1: Run the scan but DO NOT fail the pipeline yet
+      # Step 4: Run SAST scan (do NOT fail yet)
       - name: Run SAST scan
         continue-on-error: true
         env:
@@ -48,16 +44,16 @@ jobs:
             --json \
             ${{ inputs.source_path }} > sast-results.json || true
 
-      # Step 2: Enforce organization-wide severity policy
-      - name: Enforce severity policy
-        env:
-          FAIL_ON_SEVERITY: ${{ inputs.fail_on_severity }}
+      # Step 5: Enforce organization-wide SAST policy
+      - name: Enforce SAST policy
         run: |
-          echo "Enforcing SAST policy: fail on severity = $FAIL_ON_SEVERITY"
+          findings=$(jq '.results | length' sast-results.json)
 
-          if grep -q "\"severity\": \"$FAIL_ON_SEVERITY\"" sast-results.json; then
-            echo "❌ Blocking SAST findings detected (severity: $FAIL_ON_SEVERITY)"
+          echo "Total SAST findings detected: $findings"
+
+          if [ "$findings" -gt 0 ]; then
+            echo "❌ SAST findings detected. Failing the build."
             exit 1
           else
-            echo "✅ No blocking SAST findings detected"
+            echo "✅ No SAST findings detected. Build can proceed."
           fi
