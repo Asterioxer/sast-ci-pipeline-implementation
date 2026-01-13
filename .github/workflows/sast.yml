@@ -40,9 +40,10 @@ jobs:
           SEMGREP_APP_TOKEN: ${{ secrets.SAST_TOKEN }}
         run: |
           semgrep scan \
-            --config=auto \
+            --config=p/ci \
             --json \
             ${{ inputs.source_path }} > sast-results.json || true
+
 
       # Step 5: Enforce organization-wide SAST policy
       - name: Enforce SAST policy
