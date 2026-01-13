@@ -51,7 +51,7 @@ jobs:
           EOF
 
           semgrep scan \
-            --config=p/ci \
+            --config=test-rule.yml \
             --json \
             ${{ inputs.source_path }} > sast-results.json || true
 
