@@ -1,0 +1,63 @@
+name: Reusable SAST Scan
+
+on:
+  workflow_call:
+    inputs:
+      source_path:
+        description: "Path to the source code to scan"
+        required: false
+        default: "."
+        type: string
+
+      fail_on_severity:
+        description: "Severity level that should fail the build (e.g., HIGH, CRITICAL)"
+        required: false
+        default: "HIGH"
+        type: string
+
+    secrets:
+      SAST_TOKEN:
+        required: true
+
+jobs:
+  sast-scan:
+    name: Run SAST Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install SAST tool (Semgrep)
+        run: |
+          pip install semgrep
+
+      # Step 1: Run the scan but DO NOT fail the pipeline yet
+      - name: Run SAST scan
+        continue-on-error: true
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SAST_TOKEN }}
+        run: |
+          semgrep scan \
+            --config=auto \
+            --json \
+            ${{ inputs.source_path }} > sast-results.json || true
+
+      # Step 2: Enforce organization-wide severity policy
+      - name: Enforce severity policy
+        env:
+          FAIL_ON_SEVERITY: ${{ inputs.fail_on_severity }}
+        run: |
+          echo "Enforcing SAST policy: fail on severity = $FAIL_ON_SEVERITY"
+
+          if grep -q "\"severity\": \"$FAIL_ON_SEVERITY\"" sast-results.json; then
+            echo "❌ Blocking SAST findings detected (severity: $FAIL_ON_SEVERITY)"
+            exit 1
+          else
+            echo "✅ No blocking SAST findings detected"
+          fi
